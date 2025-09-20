@@ -27,6 +27,6 @@ dist/
 out/
 
 # Bootstrap secrets or temp files
-
+contact.json
 *.tmp
 *.temp

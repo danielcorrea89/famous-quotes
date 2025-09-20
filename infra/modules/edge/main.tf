@@ -109,13 +109,6 @@ resource "azurerm_dns_a_record" "apex_alias_a" {
   target_resource_id  = azurerm_cdn_frontdoor_endpoint.endpoint.id
 }
 
-# resource "azurerm_dns_aaaa_record" "apex_alias_aaaa" {
-#   name                = "@"
-#   zone_name           = var.zone_name
-#   resource_group_name = var.dns_zone_resource_group
-#   ttl                 = 300
-#   target_resource_id  = azurerm_cdn_frontdoor_endpoint.endpoint.id
-# }
 
 # www CNAME -> FD endpoint hostname
 resource "azurerm_dns_cname_record" "www_cname" {
@@ -140,25 +133,16 @@ resource "azurerm_cdn_frontdoor_route" "apex_route" {
   https_redirect_enabled  = true
   forwarding_protocol     = "HttpsOnly"
   patterns_to_match       = ["/*"]
-  link_to_default_domain  = true  # flip to false after validation if you want to hide the FD default hostname
-
+  cdn_frontdoor_custom_domain_ids = [ azurerm_cdn_frontdoor_custom_domain.apex.id ]
+  
    depends_on = [
+    azurerm_cdn_frontdoor_custom_domain.apex,
     azurerm_cdn_frontdoor_endpoint.endpoint,
     azurerm_cdn_frontdoor_origin_group.og,
     azurerm_cdn_frontdoor_origin.origin
   ]
 }
 
-# Associate apex custom domain to apex route
-resource "azurerm_cdn_frontdoor_custom_domain_association" "apex_assoc" {
-  cdn_frontdoor_custom_domain_id = azurerm_cdn_frontdoor_custom_domain.apex.id
-  cdn_frontdoor_route_ids        = [azurerm_cdn_frontdoor_route.apex_route.id]
-
-  depends_on = [
-    azurerm_dns_txt_record.asuid_apex,
-    azurerm_dns_a_record.apex_alias_a
-  ]
-}
 
 # Rule set that redirects any requests to the apex (used by the www route)
 resource "azurerm_cdn_frontdoor_rule_set" "www_redirect_rs" {
@@ -191,24 +175,26 @@ resource "azurerm_cdn_frontdoor_route" "www_route" {
   https_redirect_enabled = true
   patterns_to_match      = ["/*"]
   cdn_frontdoor_rule_set_ids = [azurerm_cdn_frontdoor_rule_set.www_redirect_rs.id]
+  cdn_frontdoor_custom_domain_ids = [ azurerm_cdn_frontdoor_custom_domain.www.id ]
 
   depends_on = [
+    azurerm_cdn_frontdoor_custom_domain.www,
     azurerm_cdn_frontdoor_endpoint.endpoint_www,
     azurerm_cdn_frontdoor_origin_group.og,
     azurerm_cdn_frontdoor_origin.origin
   ]
 }
 
-# Associate www custom domain to www route
-resource "azurerm_cdn_frontdoor_custom_domain_association" "www_assoc" {
-  cdn_frontdoor_custom_domain_id = azurerm_cdn_frontdoor_custom_domain.www.id
-  cdn_frontdoor_route_ids        = [azurerm_cdn_frontdoor_route.www_route.id]
+# # Associate www custom domain to www route
+# resource "azurerm_cdn_frontdoor_custom_domain_association" "www_assoc" {
+#   cdn_frontdoor_custom_domain_id = azurerm_cdn_frontdoor_custom_domain.www.id
+#   cdn_frontdoor_route_ids        = [azurerm_cdn_frontdoor_route.www_route.id]
 
-  depends_on = [
-    azurerm_dns_txt_record.asuid_www,
-    azurerm_dns_cname_record.www_cname
-  ]
-}
+#   depends_on = [
+#     azurerm_dns_txt_record.asuid_www,
+#     azurerm_dns_cname_record.www_cname
+#   ]
+# }
 
 # Outputs
 output "frontdoor_endpoint_hostname" { value = azurerm_cdn_frontdoor_endpoint.endpoint.host_name }
