@@ -12,7 +12,7 @@ resource "azurerm_mssql_server" "sql" {
   resource_group_name           = var.resource_group_name
   location                      = var.location
   version                       = "12.0"
-  public_network_access_enabled = false
+  public_network_access_enabled = true
   identity { type = "SystemAssigned" }
 
   azuread_administrator {

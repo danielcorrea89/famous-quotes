@@ -25,6 +25,7 @@ resource "azurerm_linux_web_app" "app" {
   location            = var.location
   service_plan_id     = azurerm_service_plan.plan.id
   https_only          = true
+  public_network_access_enabled = true
 
   site_config {
     always_on = true
