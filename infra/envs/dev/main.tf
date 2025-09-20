@@ -48,6 +48,8 @@ module "web" {
   sql_database_name              = module.data.sql_db_name
   seed_blob_url                  = module.seedstore.seed_blob_url
   seed_storage_account_id        = module.seedstore.storage_account_id
+  privatelink_subnet_id          = module.core.privatelink_subnet_id
+  web_private_dns_zone_id        = module.core.private_dns_web_id
 }
 
 module "edge" {
@@ -57,12 +59,12 @@ module "edge" {
   origin_hostname         = module.web.web_default_hostname
 
   # your existing Azure DNS zone (already created)
-  zone_name               = "myfamousquotes.net"
+  zone_name               = "${var.project_domain}"
   dns_zone_resource_group = "rg-app-domains"
 
   # apex primary + www for redirect
-  apex_domain             = "myfamousquotes.net"
-  www_domain              = "www.myfamousquotes.net"
+  apex_domain             = "${var.project_domain}"
+  www_domain              = "www.${var.project_domain}"
 }
 
 # Outputs (unchanged except the sensitive one)

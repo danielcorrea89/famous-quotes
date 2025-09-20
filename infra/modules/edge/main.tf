@@ -83,17 +83,17 @@ resource "azurerm_cdn_frontdoor_custom_domain" "www" {
 # -------------------------
 # Azure DNS records for validation + resolution
 # -------------------------
-# TXT validations (asuid and asuid.www)
-resource "azurerm_dns_txt_record" "asuid_apex" {
-  name                = "asuid"
+# TXT validations (_dnsauth and _dnsauth.www)
+resource "azurerm_dns_txt_record" "_dnsauth_apex" {
+  name                = "_dnsauth"
   zone_name           = var.zone_name
   resource_group_name = var.dns_zone_resource_group
   ttl                 = 300
   record { value = azurerm_cdn_frontdoor_custom_domain.apex.validation_token }
 }
 
-resource "azurerm_dns_txt_record" "asuid_www" {
-  name                = "asuid.www"
+resource "azurerm_dns_txt_record" "_dnsauth_www" {
+  name                = "_dnsauth.www"
   zone_name           = var.zone_name
   resource_group_name = var.dns_zone_resource_group
   ttl                 = 300
@@ -185,16 +185,51 @@ resource "azurerm_cdn_frontdoor_route" "www_route" {
   ]
 }
 
-# # Associate www custom domain to www route
-# resource "azurerm_cdn_frontdoor_custom_domain_association" "www_assoc" {
-#   cdn_frontdoor_custom_domain_id = azurerm_cdn_frontdoor_custom_domain.www.id
-#   cdn_frontdoor_route_ids        = [azurerm_cdn_frontdoor_route.www_route.id]
 
-#   depends_on = [
-#     azurerm_dns_txt_record.asuid_www,
-#     azurerm_dns_cname_record.www_cname
-#   ]
-# }
+# WAF policy (Standard/Premium AFD)
+resource "azurerm_cdn_frontdoor_firewall_policy" "waf" {
+  name                = "waf${var.project_name}dev"
+  resource_group_name = var.resource_group_name
+  sku_name            = "Standard_AzureFrontDoor"
+  mode                = "Prevention"
+
+  managed_rule {
+    type    = "DefaultRuleSet"
+    version = "2.0"
+    action = "Block"
+  }
+
+  # Optional: enable bot ruleset
+  managed_rule {
+    type    = "Microsoft_BotManagerRuleSet"
+    version = "1.0"
+    action  = "Block"
+  }
+}
+
+resource "azurerm_cdn_frontdoor_security_policy" "waf_assoc" {
+  name                                  = "sp-${var.project_name}-dev"
+  cdn_frontdoor_profile_id              = azurerm_cdn_frontdoor_profile.profile.id
+  security_policies {
+    firewall {
+      cdn_frontdoor_firewall_policy_id  = azurerm_cdn_frontdoor_firewall_policy.waf.id
+      association {
+        domain {
+          cdn_frontdoor_domain_id       = azurerm_cdn_frontdoor_custom_domain.apex.id
+        }
+        domain {
+          cdn_frontdoor_domain_id       = azurerm_cdn_frontdoor_custom_domain.www.id
+        }
+        patterns_to_match = ["/*"]
+      }
+    }
+  }
+
+  depends_on = [
+    azurerm_cdn_frontdoor_custom_domain.apex,
+    azurerm_cdn_frontdoor_custom_domain.www
+  ]
+}
 
 # Outputs
 output "frontdoor_endpoint_hostname" { value = azurerm_cdn_frontdoor_endpoint.endpoint.host_name }

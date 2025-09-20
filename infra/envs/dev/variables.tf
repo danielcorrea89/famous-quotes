@@ -8,6 +8,11 @@ variable "location" {
   default = "Australia East"
 }
 
+variable "project_domain" {
+  type    = string
+  default = "myfamousquotes.net"
+}
+
 # variable "aad_admin_login" {
 #   description = "AAD login (UPN) for SQL administrator"
 #   type        = string

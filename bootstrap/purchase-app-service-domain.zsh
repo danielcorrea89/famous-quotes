@@ -1,6 +1,6 @@
 SUBS_ID="e7cbc1ca-744a-432a-b54b-dd8b5a2d2799"
 RG_NAME="rg-app-domains"
-DOMAIN_NAME="myfamousquotes.net"
+DOMAIN_NAME="${var.project_domain}"
 
 az account set --subscription "$SUBS_ID"
 az group create -n "$RG_NAME" -l eastus 1>/dev/null
