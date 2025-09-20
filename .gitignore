@@ -1,0 +1,33 @@
+# --- Terraform (keep only the lockfile) ---
+**/.terraform/*
+**/.terraform/**
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+tf.plan
+*.tfvars
+*.auto.tfvars
+# commit examples only (e.g., dev.tfvars.example)
+!*.tfvars.example
+!*.auto.tfvars.example
+# keep the lockfile
+!.terraform.lock.hcl
+
+# Local env / OS
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Build outputs (common)
+bin/
+obj/
+dist/
+out/
+
+# Bootstrap secrets or temp files
+app-service-domain/contact.json
+contact.json
+*.tmp
+*.temp
