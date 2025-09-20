@@ -1,0 +1,16 @@
+{
+  "address1":      { "value": "123 Example Street",   "required": true  },
+  "address2":      { "value": "",                     "required": false },
+  "city":          { "value": "Sampletown",           "required": true  },
+  "country":       { "value": "US",                   "required": true, "options": [] },
+  "postal_code":   { "value": "12345",                "required": true  },
+  "state":         { "value": "CA",                   "required": true  },
+  "email":         { "value": "TODO:example@example.com", "required": true },
+  "fax":           { "value": "",                     "required": false },
+  "job_title":     { "value": "",                     "required": false },
+  "name_first":    { "value": "John",                 "required": true  },
+  "name_last":     { "value": "Doe",                  "required": true  },
+  "name_middle":   { "value": "",                     "required": false },
+  "organization":  { "value": "",                     "required": false },
+  "phone":         { "value": "+1.5555555555",        "required": true  }
+}
