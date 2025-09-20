@@ -1,9 +1,0 @@
--- run in db-famousquotes-dev
-CREATE TABLE dbo.Quotes (
-  Id INT IDENTITY(1,1) PRIMARY KEY,
-  Text NVARCHAR(1000) NOT NULL,
-  Author NVARCHAR(200) NULL,
-  Source NVARCHAR(200) NULL,
-  CreatedAt DATETIME2 NOT NULL CONSTRAINT DF_Quotes_CreatedAt DEFAULT SYSUTCDATETIME()
-);
-

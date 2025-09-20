@@ -30,3 +30,7 @@ out/
 contact.json
 *.tmp
 *.temp
+
+publish/
+
+*.zip

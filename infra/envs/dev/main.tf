@@ -7,6 +7,9 @@ module "core" {
   source       = "../../modules/core"
   project_name = var.project_name
   location     = var.location
+
+  # 👇 add this
+  uptime_url   = "https://myfamousquotes.net/healthz" 
 }
 
 module "iam" {

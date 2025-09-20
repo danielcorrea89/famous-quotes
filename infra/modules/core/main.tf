@@ -62,48 +62,79 @@ resource "azurerm_application_insights" "appi" {
   workspace_id        = azurerm_log_analytics_workspace.law.id
 }
 
+# add once (used inside the XML)
+resource "random_uuid" "webtest_id" {}
+
 resource "azurerm_application_insights_web_test" "uptime" {
   name                    = "wt-${var.project_name}-apex"
-  location                = var.location
+  location                = azurerm_resource_group.rg.location
   resource_group_name     = azurerm_resource_group.rg.name
   application_insights_id = azurerm_application_insights.appi.id
-  kind     = "ping"
-  frequency = 600   # every 5 minutes
-  timeout   = 30
-  
-  configuration = "web-test"
 
-  enabled = true
+  kind          = "ping"
+  frequency     = 300     # every 5 min
+  timeout       = 30
+  enabled       = true
+  retry_enabled = true
+
+  # this resource uses *geo_locations* (list of strings)
   geo_locations = [
-    "emea-nl-ams-azr",   # Amsterdam
-    "apac-au-syd-azr",   # Sydney
-    "us-fl-mia-edge"     # Miami edge
+    "emea-nl-ams-azr", # Amsterdam
+    "us-va-ash-azr",   # Ashburn, VA
+    "apac-hk-hkn-azr", # Hong Kong
   ]
+
+  # 👇 REQUIRED: a *string* containing the XML
+  configuration = <<XML
+  <WebTest Name="wt-${var.project_name}-apex" Id="${random_uuid.webtest_id.result}" Enabled="True" Timeout="30" StopOnError="False" PreAuthenticate="True">
+    <Items>
+      <Request Method="GET" Guid="${random_uuid.webtest_id.result}" Version="1.1"
+              Url="${var.uptime_url}" Timeout="30" ParseDependentRequests="False"
+              FollowRedirects="True" />
+    </Items>
+  </WebTest>
+  XML
 }
 
 resource "azurerm_monitor_metric_alert" "avail_low" {
   name                = "alert-availability-low"
   resource_group_name = azurerm_resource_group.rg.name
-  scopes              = [azurerm_application_insights_web_test.uptime.id]
-  description         = "Availability below 99% over last 15m"
+  description         = "Synthetic availability below threshold"
   severity            = 2
-  frequency           = "PT5M"
-  window_size         = "PT15M"
   auto_mitigate       = true
+  enabled             = true
 
+  # 👇 SCOPE MUST BE THE APP INSIGHTS COMPONENT, NOT THE WEB TEST
+  scopes = [azurerm_application_insights.appi.id]
+
+  frequency = "PT5M"
+  window_size = "PT15M"
+
+  # 👇 Correct namespace & metric for web test availability
   criteria {
-    metric_namespace = "microsoft.insights/webtests"
-    metric_name      = "Availability"
+    metric_namespace = "microsoft.insights/components"
+    metric_name      = "availabilityResults/availabilityPercentage"
     aggregation      = "Average"
     operator         = "LessThan"
     threshold        = 99
+
+    # Filter to just your web test
+    dimension {
+      name     = "availabilityResult/name"
+      operator = "Include"
+      values   = [azurerm_application_insights_web_test.uptime.name]
+    }
   }
 
-  # TODO: plug your Action Group id here when you have one:
+  # Keep your existing action group(s) if you had them:
   # action {
   #   action_group_id = azurerm_monitor_action_group.ops.id
   # }
+  
+  # Make sure the web test is created before the alert evaluates
+  depends_on = [azurerm_application_insights_web_test.uptime]
 }
+
 
 # Private DNS zones for Private Endpoints (SQL + Blob)
 resource "azurerm_private_dns_zone" "privsql" {

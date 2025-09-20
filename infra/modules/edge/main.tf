@@ -193,18 +193,19 @@ resource "azurerm_cdn_frontdoor_firewall_policy" "waf" {
   sku_name            = "Standard_AzureFrontDoor"
   mode                = "Prevention"
 
-  managed_rule {
-    type    = "DefaultRuleSet"
-    version = "2.0"
-    action = "Block"
-  }
+## ONLY SUPPORDED IN PREMIUM TIER
+  # managed_rule {
+  #   type    = "DefaultRuleSet"
+  #   version = "2.0"
+  #   action = "Block"
+  # }
 
-  # Optional: enable bot ruleset
-  managed_rule {
-    type    = "Microsoft_BotManagerRuleSet"
-    version = "1.0"
-    action  = "Block"
-  }
+  # # Optional: enable bot ruleset
+  # managed_rule {
+  #   type    = "Microsoft_BotManagerRuleSet"
+  #   version = "1.0"
+  #   action  = "Block"
+  # }
 }
 
 resource "azurerm_cdn_frontdoor_security_policy" "waf_assoc" {
