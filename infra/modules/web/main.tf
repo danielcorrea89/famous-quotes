@@ -28,6 +28,7 @@ resource "azurerm_linux_web_app" "app" {
   public_network_access_enabled = true
 
   site_config {
+    vnet_route_all_enabled = true
     always_on = true
     application_stack { dotnet_version = "8.0" }
 
@@ -67,6 +68,7 @@ resource "azurerm_linux_web_app" "app" {
 resource "azurerm_app_service_virtual_network_swift_connection" "vnet" {
   app_service_id = azurerm_linux_web_app.app.id
   subnet_id      = var.vnet_subnet_id
+  depends_on = [ azurerm_linux_web_app.app ]
 }
 
 resource "azurerm_private_endpoint" "pe_web" {
