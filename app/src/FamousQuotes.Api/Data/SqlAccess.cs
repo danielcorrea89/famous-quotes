@@ -1,3 +1,4 @@
+using Azure.Core;
 using Azure.Identity;
 using Microsoft.Data.SqlClient;
 
@@ -5,25 +6,30 @@ namespace FamousQuotes.Api.Data;
 
 public static class SqlAccess
 {
-    public static async Task<SqlConnection> CreateOpenConnectionAsync(string server, string database, CancellationToken ct = default)
+    private static readonly string[] Scope = ["https://database.windows.net/.default"];
+
+    public static async Task<SqlConnection> ConnectAsync(DatabaseOptions opt, CancellationToken ct)
     {
+        if (string.IsNullOrWhiteSpace(opt.Server) || string.IsNullOrWhiteSpace(opt.Name))
+            throw new InvalidOperationException("Database configuration is incomplete.");
+
         var csb = new SqlConnectionStringBuilder
         {
-            DataSource = $"{server}",
-            InitialCatalog = database,
+            DataSource = opt.Server,
+            InitialCatalog = opt.Name,
             Encrypt = true,
             TrustServerCertificate = false,
             ConnectTimeout = 15
         };
 
         var conn = new SqlConnection(csb.ConnectionString);
-        var credential = new DefaultAzureCredential(); // local: az login; in App Service: MSI
-        var token = await credential.GetTokenAsync(
-            new Azure.Core.TokenRequestContext(new[] { "https://database.windows.net/.default" }),
-            ct);
+
+        var credential = new DefaultAzureCredential(includeInteractiveCredentials: true);
+        var token = await credential.GetTokenAsync(new TokenRequestContext(Scope), ct);
 
         conn.AccessToken = token.Token;
         await conn.OpenAsync(ct);
+
         return conn;
     }
 }

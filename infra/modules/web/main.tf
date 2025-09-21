@@ -59,8 +59,8 @@ resource "azurerm_linux_web_app" "app" {
 
   app_settings = {
     "ApplicationInsights__ConnectionString" = var.app_insights_connection_string
-    "Sql__Server"   = var.sql_server_fqdn
-    "Sql__Database" = var.sql_database_name
+    "Database__Server"   = var.sql_server_fqdn
+    "Database__Database" = var.sql_database_name
     "Seed__BlobUrl" = var.seed_blob_url
   }
 }
