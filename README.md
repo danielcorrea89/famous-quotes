@@ -49,8 +49,9 @@ az webapp deploy   --resource-group rg-famousquotes-dev   --name app-famousquote
 ```
 
 ### 4. Enable DB Access via Managed Identity
+
+-> must be a member Entra group "sql-administrators-dev" to run:
 ```bash
-az sql server ad-admin create   --resource-group rg-famousquotes-dev   --server sql-famousquotes-dev   --display-name "AzureAD Admin"   --object-id <YOUR_AAD_OBJECT_ID>
 
 az sql db execute   --name db-famousquotes-dev   --server sql-famousquotes-dev   --resource-group rg-famousquotes-dev   --command "CREATE USER [app-famousquotes-dev] FROM EXTERNAL PROVIDER; ALTER ROLE db_datareader ADD MEMBER [app-famousquotes-dev]; ALTER ROLE db_datawriter ADD MEMBER [app-famousquotes-dev];"
 ```
@@ -98,7 +99,7 @@ AI was used strategically to **accelerate delivery**, not replace engineering ju
 - Generated docs, visuals, and tracked time  
 - Served as a sounding board for architecture trade-offs  
 
-Recruiter takeaway: *"He uses AI as a multiplier to deliver faster, but knows the details and can explain the system end-to-end."*
+I used AI as a multiplier to deliver faster, but I know all the details and can explain the system end-to-end.
 
 ---
 
