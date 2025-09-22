@@ -1,199 +1,208 @@
-# Famous Quotes – Azure Technical Challenge
+# 📘 README – Famous Quotes Challenge  
 
-## Overview
-This project implements a small **public web app hosted in Azure** that returns a random famous quote from an **Azure SQL Database**.  
-It was built as part of a time‑boxed challenge (~5h target). The solution emphasizes **security, availability, and production‑ready design**.
+## 🌟 Overview  
+This project implements a **secure, resilient, cloud-native web app** on **Azure** that:  
+- Returns a **random famous quote** from an **Azure SQL Database** 🎤  
+- Seeds itself from a **Blob Storage JSON file** if the DB is empty 📦  
+- Runs behind **Azure Front Door** with **custom domain + HTTPS** 🌍  
+- Enforces **Private Link, VNet integration, and Managed Identity** 🔐  
+- Built with **Terraform + .NET 8 (minimal API)** ⚡  
 
+---
 
-## 🌐 Architecture Overview
-
-- **Azure Front Door** – Global entry point with HTTPS + WAF policy  
-- **Private App Service (Linux, .NET 8)** – Only accessible via Front Door (locked inbound)  
-- **Azure SQL Database** – Secured with **Managed Identity** authentication, no passwords (PII Data) 
-- **Azure Storage (Blob)** – Stores JSON seed file with initial quotes  (Seeds if DB is Empty)
-- **Private Endpoints + VNet Integration** – Ensures all traffic stays inside Azure backbone  
-- **Monitoring** – Application Insights, availability test, alerts wired (basic)  
+## 🏗️ Architecture  
 
 ```mermaid
-flowchart LR
-    User --> FrontDoor(WAF + Front Door)
-    FrontDoor --> App(App Service - private)
-    App --> SQL[(Azure SQL DB)]
-    App --> Blob[(Blob Storage - seed.json)]
+flowchart TD
+    subgraph Client 🌐
+      Browser
+    end
+
+    subgraph Edge 🌍
+      AFD[Azure Front Door 🌍] --> |Custom Domain myfamousquotes.net| Browser
+      WAF[WAF 🔒]
+      AFD --> WAF
+    end
+
+    subgraph AppTier ⚙️
+      AppSvc[App Service 🚀]
+      VNet[VNet Integration 🌐]
+      PE[Private Endpoint 🔐]
+      AFD --> AppSvc
+      AppSvc --> VNet
+      AppSvc --> PE
+    end
+
+    subgraph DataTier 💾
+      SQL[(Azure SQL Database 📖)]
+      Blob[(Blob Storage 📦 quotes.json)]
+      PE --> SQL
+      AppSvc --> SQL
+      AppSvc --> Blob
+    end
 ```
 
 ---
 
-## 🚀 Deployment Guide
+## ⚡ Bootstrap (One-time)  
+Create Terraform state storage + optional domain purchase.  
 
----
-
-## Prerequisites
-- Azure subscription with Owner/Contributor access
-- [Terraform](https://developer.hashicorp.com/terraform/downloads)
-- [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
-- [.NET 8 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/8.0)
-
----
-
-## Bootstrap
-
-### 1. Bootstrap Terraform remote state
 ```bash
-cd bootstrap
-./provision-terraform-state.zsh
+# Variables
+RESOURCE_GROUP="rg-terraform-state"
+STORAGE_ACCOUNT="stfamousquotestfstate"
+CONTAINER_NAME="tfstate"
+
+# Create RG + Storage Account + Container
+az group create -n $RESOURCE_GROUP -l australiaeast
+az storage account create -n $STORAGE_ACCOUNT -g $RESOURCE_GROUP -l australiaeast --sku Standard_LRS
+az storage container create -n $CONTAINER_NAME --account-name $STORAGE_ACCOUNT
 ```
-This creates a **storage account + container** to hold the Terraform remote state.
+
+*(Optional)* Purchase your custom domain in Azure App Service Domains, e.g. `myfamousquotes.net`.  
 
 ---
 
-### 2. (Optional) Purchase and configure domain
+## 🚀 Deploy Infra  
+
 ```bash
-./purchase-app-service-domain.zsh
+cd infra
+terraform init -backend-config="storage_account_name=stfamousquotestfstate"                -backend-config="container_name=tfstate"                -backend-config="resource_group_name=rg-terraform-state"
+terraform apply
 ```
-Provision an Azure‑managed domain and delegate DNS.  
-*Optional – skip if you don’t need a custom domain.*
+
+This provisions:  
+- Resource groups  
+- SQL Server + Database  
+- App Service Plan (Linux) + App Service  
+- VNet integration + Private Endpoints  
+- Azure Front Door with **myfamousquotes.net** + redirect from `www.`  
 
 ---
 
-## Infrastructure Deployment
+## 📦 Upload Seed Quotes  
 
-### 3. Set variables
-Edit `infra/envs/dev/variables.tfvars` with your project name, location, and DNS zone.
+The app seeds from **Blob Storage** (`stfamousquotesdev` / container `seed` / file `quotes.json`).  
 
-### 4. Deploy infrastructure
 ```bash
-cd infra/envs/dev
-terraform init -backend-config=backend.conf
-terraform apply -var-file=variables.tfvars
-```
+az storage container create   --account-name stfamousquotesdev   --name seed   --auth-mode login
 
-This provisions:
-- RG, VNet, subnets
-- Azure SQL server + DB
-- App Service Plan + Linux Web App
-- Private Endpoint + Private DNS Zone
-- Azure Front Door (apex + www redirect, TLS)
-- Application Insights
+az storage blob upload   --account-name stfamousquotesdev   --container-name seed   --name quotes.json   --file app/sql/quotes.json   --overwrite   --auth-mode login
+```
 
 ---
 
-## Data & Identity Setup
+## 🔑 Enable Managed Identity in SQL  
 
-### 5. Upload seed quotes
-Upload `quotes.json` into the seed blob container:
-```bash
-az storage blob upload   --account-name <storage-name>   --container-name seed   --file app/sql/quotes.json   --name quotes.json
-```
-> ⚠️ Quotes are treated as **PII** for this challenge.
+Run `app/sql/setup-managed-identity.sql` against:  
+1. `master` DB (no-op, safe)  
+2. `db-famousquotes-dev`  
 
----
-
-### 6. Grant Managed Identity DB access
-Run `app/sql/setup-managed-identity.sql` against both **master** and **db-famousquotes-dev**:
 ```sql
--- master DB (safe no-op)
-CREATE USER [app-famousquotes-dev] FROM EXTERNAL PROVIDER;
-
--- in db-famousquotes-dev
 CREATE USER [app-famousquotes-dev] FROM EXTERNAL PROVIDER;
 ALTER ROLE db_datareader ADD MEMBER [app-famousquotes-dev];
 ALTER ROLE db_datawriter ADD MEMBER [app-famousquotes-dev];
-ALTER ROLE db_ddladmin ADD MEMBER [app-famousquotes-dev]; -- required to CREATE TABLE
 ```
+
+This gives the App Service MI least-privilege access.  
 
 ---
 
-## App Deployment
+## 📤 Deploy App  
 
-### 7. Build & publish
+### 1. Publish & Zip  
 ```bash
 dotnet publish -c Release -o publish app/src/FamousQuotes.Api
+cd publish
+zip -r ../famousquotes.zip .
+cd ..
 ```
 
-### 8. Deploy via zip
+### 2. Deploy to Azure  
 ```bash
-az webapp deploy   --resource-group rg-famousquotes-dev   --name app-famousquotes-dev   --src-path publish   --type zip
+az webapp deployment source config-zip   --resource-group rg-famousquotes-dev   --name app-famousquotes-dev   --src famousquotes.zip
 ```
 
 ---
 
-## Test
+## ✅ Test  
 
-- Health probe:  
-  `https://<frontdoor-hostname>/healthz`
-- Random quote:  
-  `https://<frontdoor-hostname>/`
+```bash
+curl https://myfamousquotes.net
+```
 
----
+Expected response:  
+```json
+{
+  "id": 42,
+  "text": "The only limit to our realization of tomorrow is our doubts of today.",
+  "author": "F. D. Roosevelt",
+  "source": "quotes.json"
+}
+```
 
-## Operations
-
-- **Logs & metrics:** Application Insights
-- **Alerts:** Availability test + sample metric alert (attach Action Group to send notifications)
-- **Cleanup:**  
-  ```bash
-  terraform destroy -var-file=variables.tfvars
-  ```
-
----
-
-## Next Steps (>5h improvements)
-
-- **Terraform state hardening** (effort: ~1.5h)  
-  - Geo‑redundant storage (GRS/ZRS)  
-  - Blob soft‑delete & immutability  
-  - Network isolation (private endpoints for state)
-
-- **CICD pipelines** (~2h)  
-  - GitHub Actions for infra + app deploy  
-  - Automate MI → SQL user creation
-
-- **Platform vs app split** (~2h)  
-  - Core infra (network, SQL, FD profile, plans) reusable across projects  
-  - App slice only deploys vertical: domain, routes, app, private links
-
-- **Resilience** (~2h)  
-  - Secondary App Service Plan in paired region  
-  - Blue/green or active/active routing with FD
-
-- **SQL tier & redundancy** (~1.5h)  
-  - Zone redundant tier (Business Critical) for higher SLA
-
-- **Security & observability** (~2h)  
-  - WAF policies (headers, rate limiting)  
-  - Action Groups → email/SMS/Teams alerts  
-  - Cost alerts
+Health probe:  
+```bash
+curl https://myfamousquotes.net/healthz
+```
 
 ---
 
-## Time Breakdown (~5h target)
+## 📊 Next Steps (>5h improvements)  
 
-- Hour 1: Design, Terraform skeleton, remote state
-- Hour 2: Core infra (SQL, App Service, network, private link)
-- Hour 3: Front Door, DNS, HTTPS, App Insights
-- Hour 4: .NET API, seeding logic (DB + Blob via MI)
-- Hour 5: Docs, alerts, polish
+### Terraform State  
+- [ ] Enable **ZRS redundancy** for tfstate storage (1.5h)  
+- [ ] Add **immutability / soft delete** for blobs (1h)  
+- [ ] Restrict access via **Private Endpoint** (2h)  
 
-> First Terraform project: delivered **48 Azure resources** with private networking, MI, PII handling, monitoring, and secure ingress (Front Door only).
+### Core Infra  
+- [ ] Modularize: move **core infra** (network, SQL, App Service Plan, Front Door profile) into a **shared project** (2h)  
+- [ ] Keep **app-specific slice** (domain, routes, app svc, MI) separate (1.5h)  
+- [ ] Add **paired region App Service** for blue/green (3h)  
+
+### Pipelines  
+- [ ] GitHub Actions to:  
+  - Run Terraform  
+  - Deploy App  
+  - Run SQL MI setup (via SPN)  
+
+### Availability & Security  
+- [ ] Zone redundant SQL (2h)  
+- [ ] Add WAF rules (1.5h)  
+- [ ] Add alerts + action groups (1h)  
+
+---
+
+## 🤖 How I Used AI  
+
+- Generated **initial .NET app scaffolding**  
+- Debugged **Terraform provider quirks** (Front Door associations, DNS auth)  
+- Wrote **seed logic** for Blob + SQL  
+- Discussed **design trade-offs** (private endpoints vs public, vnet integration)  
+- Tracked **progress + time** like a virtual pair engineer  
+
+**AI was a productivity multiplier** — but all code & infra were validated, tested, and fully understood.  
 
 ---
 
-## Cost Snapshot (AU East)
+## ⏱️ Time Breakdown (~5h)  
 
-- App Service Plan P1v3: ~AUD 200/mo  
-- Azure SQL S0: ~AUD 20/mo  
-- Storage + DNS + Insights + Front Door: ~AUD 50–80/mo  
-**≈ AUD 270–300/mo total** (dev‑grade).  
-*Production SLA upgrade: Zone‑redundant SQL + App Service scaling.*
-
----
-
-## Use of AI
-- **Codegen:** Bootstrapped .NET seeding logic, SQL MI access, Terraform fixes
-- **Debugging:** Azure provider errors, App Service VNet quirks
-- **Design partner:** sanity‑checked architecture, identified blind spots
-- **Productivity:** kept a running log + time budget
-- **Mindset:** AI was used to **accelerate delivery**, not replace engineering judgment
+| Hour | What I built |
+|------|--------------|
+| 1    | Terraform core (RG, SQL, ASP, App Service) |
+| 2    | Front Door + custom domain + DNS validation |
+| 3    | Private endpoints, MI, Blob setup |
+| 4    | .NET app (Program.cs with seeding & random quotes) |
+| 5    | Docs, monitoring, alert skeleton |
 
 ---
+
+## 💰 Cost Estimate (dev env)  
+
+- App Service Plan (P1v3): ~AUD 200/mo  
+- Azure SQL (S0): ~AUD 20/mo  
+- Storage: < AUD 5/mo  
+- Front Door: ~AUD 30/mo  
+- **Total: ~AUD 255/mo** (dev)  
+
+Prod would scale with zone redundancy & multi-region.  
